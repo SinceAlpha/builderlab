@@ -1,9 +1,159 @@
 ---
-title: Hello
+title: 3D Printer Calibration Calculators
 layout: default
 ---
 
-Hello!
+<h1>3D Printer Calculators</h1>
 
+## Probe Offset Calculator
+<p>Calculate the X and Y offsets between the nozzle and probe positions:</p>
+<form>
+    <label for="nozzle_x">Enter the nozzle X position:</label>
+    <input type="number" id="nozzle_x" step="0.01"><br>
 
-Welcome to Builder Lab 3DP 
+    <label for="nozzle_y">Enter the nozzle Y position:</label>
+    <input type="number" id="nozzle_y" step="0.01"><br>
+
+    <label for="probe_x">Enter the probe X position:</label>
+    <input type="number" id="probe_x" step="0.01"><br>
+
+    <label for="probe_y">Enter the probe Y position:</label>
+    <input type="number" id="probe_y" step="0.01"><br><br>
+
+    <button type="button" onclick="runProbeOffsetCalculator()">Calculate Offset</button>
+</form>
+
+<pre id="probe-offset-output"></pre>
+
+<p><strong>Instructions:</strong> Enter the nozzle and probe positions. The X and Y offsets will be calculated for updating your printer's configuration.</p>
+
+<hr>
+
+## Mesh Min/Max Calculator
+<p>Calculate mesh boundaries based on bed size and probe offset:</p>
+<form>
+    <label for="min_x">Enter the minimum X position:</label>
+    <input type="number" id="min_x" step="0.01"><br>
+
+    <label for="max_x">Enter the maximum X position:</label>
+    <input type="number" id="max_x" step="0.01"><br>
+
+    <label for="min_y">Enter the minimum Y position:</label>
+    <input type="number" id="min_y" step="0.01"><br>
+
+    <label for="max_y">Enter the maximum Y position:</label>
+    <input type="number" id="max_y" step="0.01"><br>
+
+    <label for="x_offset">Enter the probe X offset:</label>
+    <input type="number" id="x_offset" step="0.01"><br>
+
+    <label for="y_offset">Enter the probe Y offset:</label>
+    <input type="number" id="y_offset" step="0.01"><br><br>
+
+    <button type="button" onclick="runMeshMinMaxCalculator()">Calculate Mesh Min/Max</button>
+</form>
+
+<pre id="mesh-output"></pre>
+
+<p><strong>Instructions:</strong> Enter the minimum and maximum X/Y positions of your bed and the X/Y offsets of your probe. The mesh min/max boundaries will be calculated based on these values.</p>
+
+<hr>
+
+## Klipper E-Step Calculator
+<p>Calculate the new rotation distance (RD) based on the desired and actual extrude lengths:</p>
+<form>
+    <label for="original_rd">Enter the original rotation distance (RD):</label>
+    <input type="number" id="original_rd" step="0.0001"><br>
+
+    <label for="desired_extrude_length">Enter the desired extrude length (mm):</label>
+    <input type="number" id="desired_extrude_length" step="0.01"><br>
+
+    <label for="actual_extrude_length">Enter the actual extrude length (mm):</label>
+    <input type="number" id="actual_extrude_length" step="0.01"><br><br>
+
+    <button type="button" onclick="runEstepCalculator()">Calculate New Rotation Distance</button>
+</form>
+
+<pre id="estep-output"></pre>
+
+<p><strong>Instructions:</strong> Enter the original rotation distance, desired extrude length, and actual extrude length. The new rotation distance will be calculated for your extruder configuration.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/brython@3.9.5/brython.min.js"></script>
+<script type="text/python">
+import sys
+import io
+
+# Probe Offset Calculator
+def runProbeOffsetCalculator():
+    nozzle_x = float(document["nozzle_x"].value)
+    nozzle_y = float(document["nozzle_y"].value)
+    probe_x = float(document["probe_x"].value)
+    probe_y = float(document["probe_y"].value)
+
+    x_offset = nozzle_x - probe_x
+    y_offset = nozzle_y - probe_y
+
+    output = f"X Offset: {x_offset:.2f}\nY Offset: {y_offset:.2f}\n"
+    output += "\nUpdate your printer.cfg with these values, remove tape/marks from the bed, and issue a RESTART command."
+    
+    document["probe-offset-output"].text = output
+
+# Mesh Min/Max Calculator
+def calculate_mesh(min_x, max_x, min_y, max_y, x_offset, y_offset):
+    if x_offset > 0:
+        mesh_x_min = min_x + max(15, x_offset)
+    else:
+        mesh_x_min = min_x + 15
+
+    if y_offset > 0:
+        mesh_y_min = min_y + max(15, y_offset)
+    else:
+        mesh_y_min = min_y + 15
+
+    if x_offset < 0:
+        mesh_x_max = max_x - max(15, abs(x_offset))
+    else:
+        mesh_x_max = max_x - 15
+
+    if y_offset < 0:
+        mesh_y_max = max_y - max(15, abs(y_offset))
+    else:
+        mesh_y_max = max_y - 15
+
+    return mesh_x_min, mesh_x_max, mesh_y_min, mesh_y_max
+
+def runMeshMinMaxCalculator():
+    min_x = float(document["min_x"].value)
+    max_x = float(document["max_x"].value)
+    min_y = float(document["min_y"].value)
+    max_y = float(document["max_y"].value)
+    x_offset = float(document["x_offset"].value)
+    y_offset = float(document["y_offset"].value)
+
+    mesh_x_min, mesh_x_max, mesh_y_min, mesh_y_max = calculate_mesh(min_x, max_x, min_y, max_y, x_offset, y_offset)
+
+    output = f"Mesh min: ({mesh_x_min:.2f}, {mesh_y_min:.2f})\nMesh max: ({mesh_x_max:.2f}, {mesh_y_max:.2f})"
+    document["mesh-output"].text = output
+
+# Klipper E-Step Calculator
+def calculate_rotation_distance(original_rd, desired_extrude_length, actual_extrude_length):
+    new_rd = original_rd * (desired_extrude_length / actual_extrude_length)
+    return new_rd
+
+def runEstepCalculator():
+    try:
+        original_rd = float(document["original_rd"].value)
+        desired_extrude_length = float(document["desired_extrude_length"].value)
+        actual_extrude_length = float(document["actual_extrude_length"].value)
+
+        new_rd = calculate_rotation_distance(original_rd, desired_extrude_length, actual_extrude_length)
+        output = f"The new rotation distance is: {new_rd:.4f} mm/rev"
+        document["estep-output"].text = output
+
+    except ValueError:
+        document["estep-output"].text = "Invalid input! Please enter numeric values for all inputs."
+
+</script>
+<script>
+  window.onload = function() { brython(); }
+</script>
